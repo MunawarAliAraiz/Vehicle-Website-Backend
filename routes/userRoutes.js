@@ -6,6 +6,7 @@ const User = require('../models/userModel');
 const { hashPassword } = require('../utils/bcryptUtils');
 const bcrypt = require('bcrypt');
 const { auth, adminAuth } = require('../middleware/authMiddleware');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const dotenv = require('dotenv');
 
 // Load environment variables
@@ -92,6 +93,50 @@ router.post('/adminpanellogin', async (req, res) => {
     }
 });
 
+// Route for changing the admin password
+router.put('/adminchangepassword', adminAuth, async (req, res) => {
+    try {
+        // Find the admin user by email
+        let adminUser = await User.findOne({ email: 'admin@gmail.com' });
+
+        // If admin user not found, return an error
+        if (!adminUser) {
+            return res.status(404).json({
+                success: false,
+                message: 'Admin user not found',
+            });
+        }
+
+        // Compare the provided current password with the stored hashed password
+        const passwordMatch = await bcrypt.compare(req.body.currentPassword, adminUser.password);
+
+        // If passwords don't match, return an error
+        if (!passwordMatch) {
+            return res.status(400).json({
+                success: false,
+                message: 'Current password is incorrect',
+            });
+        }
+
+        // Hash the new password
+        const hashedNewPassword = await hashPassword(req.body.newPassword);
+
+        // Update the admin user's password with the new hashed password
+        adminUser.password = hashedNewPassword;
+        await adminUser.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Admin password changed successfully',
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message,
+        });
+    }
+});
+
 
 // Registration route
 router.post('/register', async (req, res) => {
@@ -111,7 +156,7 @@ router.post('/register', async (req, res) => {
         const user = new User({
             name: req.body.name,
             email: req.body.email,
-            profile_image: req.body.profile_image,
+            profile_image: req.body.profile_image ? req.body.profile_image : 'https://www.pngitem.com/pimgs/m/146-1468479_my-profile-icon-blank-profile-picture-circle-hd.png',
             password: hashedPassword,
         });
 
@@ -138,6 +183,39 @@ router.post('/register', async (req, res) => {
         });
     }
 });
+
+// Login route
+router.post('/login', async (req, res) => {
+    console.log(req.body);
+    try {
+      // Extract email and password from request body
+      const { email, password } = req.body;
+  
+      // Check if the user exists
+      const user = await User.findOne({ email });
+  
+      if (!user) {
+        return res.status(400).json({ success: false, message: 'Invalid credentials' });
+      }
+  
+      // Compare the provided password with the hashed password in the database
+      const passwordMatch = await bcrypt.compare(password, user.password);
+  
+      if (!passwordMatch) {
+        return res.status(400).json({ success: false, message: 'Invalid credentials' });
+      }
+
+      // Generate JWT token
+      const payload = { user: { id: user.id } };
+      const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
+  
+      // Send token as response
+      res.status(200).json({ success: true, token, message: 'User logged in successfully'});
+    } catch (error) {
+      console.error('Error during login:', error.message);
+      res.status(500).json({ success: false, message: 'Internal Server Error' });
+    }
+  });
 
 // List users route
 router.get('/list', async (req, res) => {
@@ -205,5 +283,43 @@ router.delete('/delete/:userId', async (req, res) => {
         });
     }
 });
+
+// Endpoint for checkout using Stripe
+router.post('/checkout-session', auth, async (req, res) => {
+    const {products} = req.body;
+
+    const lineItems = products.map(product => {
+        return {
+            price_data: {
+                currency: 'usd',
+                product_data: {
+                    name: product.name,
+                    images: [product.image],
+                },
+                unit_amount: Math.round(product.price*100),
+            },
+            quantity: product.quantity,
+        }
+    });
+
+    const car = products[0]
+
+    const success_url = `http://localhost:3000/success/${car.id}/${encodeURIComponent(car.name)}/${car.quantity}/${car.price}`;
+
+    try {
+        const session = await stripe.checkout.sessions.create({
+            payment_method_types: ['card'],
+            line_items: lineItems,
+            mode: 'payment',
+            success_url: success_url,
+            cancel_url: 'http://localhost:3000/cancel',
+        });
+
+        res.json({ id: session.id });
+    } catch (error) {
+        console.error('Error creating checkout session:', error.message);
+        res.status(500).json({ error: 'Failed to create checkout session' });
+    }
+})
 
 module.exports = router;

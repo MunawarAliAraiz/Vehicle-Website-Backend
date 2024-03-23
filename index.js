@@ -21,6 +21,7 @@ app.use('/api/upload', require('./routes/uploadRoutes'));
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/blogs', require('./routes/blogRoutes'));
 app.use('/api/cars', require('./routes/carRoutes'));
+app.use('/api/orders', require('./routes/orderRoutes'));
 
 
 // API's

@@ -18,6 +18,7 @@ const User = mongoose.model('User', {
     },
     profile_image: {
         type: String,
+        default: 'https://www.pngitem.com/pimgs/m/146-1468479_my-profile-icon-blank-profile-picture-circle-hd.png',
     },
     date: {
         type: Date,

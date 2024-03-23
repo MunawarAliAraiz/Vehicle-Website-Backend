@@ -6,8 +6,8 @@ const User = require('../models/userModel');
 const { hashPassword } = require('../utils/bcryptUtils');
 const bcrypt = require('bcrypt');
 const { auth, adminAuth } = require('../middleware/authMiddleware');
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const dotenv = require('dotenv');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 // Load environment variables
 dotenv.config();
@@ -304,7 +304,7 @@ router.post('/checkout-session', auth, async (req, res) => {
 
     const car = products[0]
 
-    const success_url = `http://localhost:3000/success/${car.id}/${encodeURIComponent(car.name)}/${car.quantity}/${car.price}`;
+    const success_url = `${process.env.USERPANEL_URL}/success/${car.id}/${encodeURIComponent(car.name)}/${car.quantity}/${car.price}`;
 
     try {
         const session = await stripe.checkout.sessions.create({
@@ -312,7 +312,7 @@ router.post('/checkout-session', auth, async (req, res) => {
             line_items: lineItems,
             mode: 'payment',
             success_url: success_url,
-            cancel_url: 'http://localhost:3000/cancel',
+            cancel_url: `${process.env.USERPANEL_URL}/cancel`,
         });
 
         res.json({ id: session.id });

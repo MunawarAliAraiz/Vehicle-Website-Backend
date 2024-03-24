@@ -2,9 +2,12 @@ const express = require('express');
 const path = require('path');
 const {profile_upload, blog_upload, car_upload} = require('../multerConfig/multerConfig');
 const router = express.Router();
+const dotenv = require('dotenv');
 
+// Load environment variables
+dotenv.config();
 
-const serverUrl = "http://localhost:4000/";
+const serverUrl = process.env.SERVER_URL || 'http://localhost:4000/';
 
 // Define routes for handling uploads
 router.use('/profile_images', express.static(path.join(__dirname, '../upload/profile_images')));
